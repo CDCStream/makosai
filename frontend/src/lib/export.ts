@@ -48,7 +48,7 @@ function renderLatexToHtml(text: string): string {
   if (!text) return '';
 
   // Replace display math ($$...$$) first
-  let result = text.replace(/\$\$(.*?)\$\$/gs, (match, latex) => {
+  let result = text.replace(/\$\$([\s\S]*?)\$\$/g, (match, latex) => {
     try {
       return katex.renderToString(latex, {
         displayMode: true,
@@ -83,7 +83,7 @@ function stripLatex(text: string): string {
   if (!text) return '';
 
   // Replace display math
-  let result = text.replace(/\$\$(.*?)\$\$/gs, (_, latex) => {
+  let result = text.replace(/\$\$([\s\S]*?)\$\$/g, (_, latex) => {
     return `[${latex}]`;
   });
 
@@ -1459,7 +1459,7 @@ export function exportToHtml(worksheet: Worksheet, content: 'questions' | 'answe
         </div>
         ` : ''}
 
-        ${showAnswerKey && content !== 'questions' ? `
+        ${showAnswerKey ? `
             <div class="answer-key" id="answerKey">
                 ${content === 'answer_key' ? `
                     <h2 style="color: #10b981; margin-bottom: 20px; font-size: 20px;">✅ Answer Key</h2>
@@ -1621,18 +1621,6 @@ export function exportToHtml(worksheet: Worksheet, content: 'questions' | 'answe
     </script>
     ` : ''}
 
-    ${!showQuestions && showAnswerKey && content === 'both' ? `
-    <script>
-        function toggleAnswerKey() {
-            const content = document.getElementById('answerKeyContent');
-            const icon = document.getElementById('toggleIcon');
-            if (content && icon) {
-                content.classList.toggle('open');
-                icon.classList.toggle('open');
-            }
-        }
-    </script>
-    ` : ''}
 </body>
 </html>`;
 
