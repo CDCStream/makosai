@@ -24,7 +24,7 @@ export default function LoginPage() {
     const result = await signInWithEmail(email, password);
 
     if (result.error) {
-      setError(result.error);
+      setError(result.error.message || 'Login failed');
       setLoading(false);
     } else {
       router.push('/generator');
