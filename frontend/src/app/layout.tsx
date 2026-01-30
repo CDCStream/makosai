@@ -5,7 +5,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/AuthContext";
 import { ModalProvider } from "@/components/Modal";
 
-const GA_MEASUREMENT_ID = "G-493425843";
+const GA_MEASUREMENT_ID = "G-SZW6X77247";
 
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
