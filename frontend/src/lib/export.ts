@@ -96,7 +96,7 @@ function stripLatex(text: string): string {
 }
 
 export async function exportToPdf(worksheet: Worksheet, content: 'questions' | 'answer_key' | 'both' = 'both'): Promise<void> {
-  console.log('🚀 PDF Export started - using print method for perfect LaTeX rendering');
+  console.log('🚀 PDF Export started - using html2pdf for direct download');
 
   const title = content === 'questions'
     ? worksheet.title
@@ -107,22 +107,54 @@ export async function exportToPdf(worksheet: Worksheet, content: 'questions' | '
   // Generate print-friendly HTML with KaTeX
   const printHtml = generatePrintablePdfHtml(worksheet, content, title);
 
-  // Open in new window and trigger print
-  const printWindow = window.open('', '_blank', 'width=800,height=600');
-  if (!printWindow) {
-    showDOMModal('Pop-up engellendi. Lütfen pop-up engelleyiciyi devre dışı bırakın.', 'warning');
-    return;
+  // Create a temporary container
+  const container = document.createElement('div');
+  container.innerHTML = printHtml;
+  container.style.position = 'absolute';
+  container.style.left = '-9999px';
+  container.style.top = '0';
+  document.body.appendChild(container);
+
+  // Wait for KaTeX CSS to load
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  try {
+    // Dynamic import html2pdf
+    const html2pdf = (await import('html2pdf.js')).default;
+
+    const filename = content === 'questions'
+      ? `${worksheet.title.replace(/\s+/g, '_')}_questions.pdf`
+      : content === 'answer_key'
+      ? `${worksheet.title.replace(/\s+/g, '_')}_answer_key.pdf`
+      : `${worksheet.title.replace(/\s+/g, '_')}.pdf`;
+
+    const opt = {
+      margin: 10,
+      filename: filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        letterRendering: true
+      },
+      jsPDF: {
+        unit: 'mm',
+        format: 'a4',
+        orientation: 'portrait'
+      },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+
+    await html2pdf().set(opt).from(container).save();
+    console.log('✅ PDF exported successfully');
+  } catch (error) {
+    console.error('PDF export error:', error);
+    showDOMModal('PDF oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.', 'error');
+  } finally {
+    // Clean up
+    document.body.removeChild(container);
   }
-
-  printWindow.document.write(printHtml);
-  printWindow.document.close();
-
-  // Wait for KaTeX to load and render, then print
-  printWindow.onload = () => {
-    setTimeout(() => {
-      printWindow.print();
-    }, 500);
-  };
 }
 
 // Generate print-friendly HTML with proper KaTeX rendering
