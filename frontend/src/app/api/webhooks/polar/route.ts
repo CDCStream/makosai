@@ -60,7 +60,7 @@ export const POST = Webhooks({
         // If checkout is confirmed/succeeded
         if (payload.data.status === "succeeded") {
           const metadata = payload.data.metadata as Record<string, string> | undefined;
-          const customerEmail = payload.data.customer_email;
+          const customerEmail = (payload.data as Record<string, unknown>).customerEmail as string | undefined;
 
           console.log("✅ Payment succeeded!");
           console.log("📧 Customer email:", customerEmail);
@@ -172,7 +172,7 @@ export const POST = Webhooks({
 
         // Try to find by email if no user_id
         if (!subCreatedUserId) {
-          const subEmail = (payload.data as Record<string, unknown>).customer_email as string;
+          const subEmail = (payload.data as Record<string, unknown>).customerEmail as string;
           if (subEmail) {
             subCreatedUserId = await findUserByEmail(subEmail) || undefined;
           }
@@ -206,7 +206,7 @@ export const POST = Webhooks({
 
         // Try to find by email if no user_id
         if (!orderUserId) {
-          const orderEmail = (payload.data as Record<string, unknown>).customer_email as string;
+          const orderEmail = (payload.data as Record<string, unknown>).customerEmail as string;
           if (orderEmail) {
             orderUserId = await findUserByEmail(orderEmail) || undefined;
           }
@@ -253,7 +253,7 @@ export const POST = Webhooks({
 
         // Try to find by email if no user_id
         if (!subUserId) {
-          const cancelEmail = (payload.data as Record<string, unknown>).customer_email as string;
+          const cancelEmail = (payload.data as Record<string, unknown>).customerEmail as string;
           if (cancelEmail) {
             subUserId = await findUserByEmail(cancelEmail) || undefined;
           }
