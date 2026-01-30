@@ -380,10 +380,23 @@ function GeneratorContent() {
                         setError(null);
                         setIsGenerating(false);
                         setGenerationStep(0);
+                        // Scroll to form for retry
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
-                      className="w-full py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-bold rounded-xl hover:from-teal-600 hover:to-cyan-600 transition-all"
+                      className="w-full py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-bold rounded-xl hover:from-teal-600 hover:to-cyan-600 transition-all flex items-center justify-center gap-2"
                     >
+                      <RefreshCw className="w-5 h-5" />
                       Try Again
+                    </button>
+                    <button
+                      onClick={() => {
+                        setError(null);
+                        setIsGenerating(false);
+                        setGenerationStep(0);
+                      }}
+                      className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-all"
+                    >
+                      Cancel
                     </button>
                     <p className="text-xs text-gray-400">
                       If the problem persists, please check your internet connection or try again later.

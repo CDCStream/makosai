@@ -60,9 +60,9 @@ export async function generateWorksheet(input: WorksheetGeneratorInput, userId?:
 
     return data;
   } catch (error) {
-    console.error('API generation failed, using demo generation:', error);
-    // Return demo worksheet
-    return generateDemoWorksheet(input, userId);
+    console.error('API generation failed:', error);
+    // Re-throw the error so the UI can handle it
+    throw error;
   }
 }
 

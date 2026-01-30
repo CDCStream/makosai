@@ -96,7 +96,7 @@ function stripLatex(text: string): string {
 }
 
 export async function exportToPdf(worksheet: Worksheet, content: 'questions' | 'answer_key' | 'both' = 'both'): Promise<void> {
-  console.log('🚀 PDF Export started - using html2pdf for direct download');
+  console.log('🚀 PDF Export started - using jsPDF with html2canvas');
 
   const title = content === 'questions'
     ? worksheet.title
@@ -104,49 +104,82 @@ export async function exportToPdf(worksheet: Worksheet, content: 'questions' | '
     ? `${worksheet.title} - Answer Key`
     : worksheet.title;
 
-  // Generate print-friendly HTML with KaTeX
+  // Generate print-friendly HTML
   const printHtml = generatePrintablePdfHtml(worksheet, content, title);
 
-  // Create a temporary container
+  // Create a visible container (required for html2canvas)
   const container = document.createElement('div');
   container.innerHTML = printHtml;
-  container.style.position = 'absolute';
-  container.style.left = '-9999px';
-  container.style.top = '0';
+  container.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 210mm;
+    background: white;
+    z-index: -1;
+    opacity: 0;
+    pointer-events: none;
+  `;
   document.body.appendChild(container);
 
-  // Wait for KaTeX CSS to load
-  await new Promise(resolve => setTimeout(resolve, 500));
+  // Get the actual content element
+  const contentElement = container.querySelector('body') || container;
 
   try {
-    // Dynamic import html2pdf
-    const html2pdf = (await import('html2pdf.js')).default;
+    // Wait for content to render
+    await new Promise(resolve => setTimeout(resolve, 500));
 
+    // Dynamic imports
+    const html2canvas = (await import('html2canvas')).default;
+    const { jsPDF } = await import('jspdf');
+
+    // Capture the content
+    const canvas = await html2canvas(container, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff',
+      width: 794, // A4 width in pixels at 96 DPI
+      windowWidth: 794,
+    });
+
+    // Create PDF
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    });
+
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pdfWidth;
+    const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+    let heightLeft = imgHeight;
+    let position = 0;
+
+    // Add first page
+    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pdfHeight;
+
+    // Add additional pages if needed
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight;
+    }
+
+    // Generate filename
     const filename = content === 'questions'
       ? `${worksheet.title.replace(/\s+/g, '_')}_questions.pdf`
       : content === 'answer_key'
       ? `${worksheet.title.replace(/\s+/g, '_')}_answer_key.pdf`
       : `${worksheet.title.replace(/\s+/g, '_')}.pdf`;
 
-    const opt = {
-      margin: 10,
-      filename: filename,
-      image: { type: 'jpeg' as const, quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        letterRendering: true
-      },
-      jsPDF: {
-        unit: 'mm' as const,
-        format: 'a4' as const,
-        orientation: 'portrait' as const
-      },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] as const }
-    };
-
-    await html2pdf().set(opt).from(container).save();
+    // Save PDF
+    pdf.save(filename);
     console.log('✅ PDF exported successfully');
   } catch (error) {
     console.error('PDF export error:', error);
