@@ -205,7 +205,7 @@ export async function exportToPdf(worksheet: Worksheet, content: 'questions' | '
   }
 }
 
-// Generate print-friendly HTML with proper KaTeX rendering
+// Generate print-friendly HTML with simple CSS for html2canvas compatibility
 function generatePrintablePdfHtml(worksheet: Worksheet, content: 'questions' | 'answer_key' | 'both', title: string): string {
   const showQuestions = content === 'questions' || content === 'both';
   const showAnswerKey = (content === 'answer_key' || content === 'both') && worksheet.include_answer_key;
@@ -225,33 +225,33 @@ function generatePrintablePdfHtml(worksheet: Worksheet, content: 'questions' | '
   const renderImage = (image: string | undefined): string => {
     if (!image) return '';
     if (image.trim().startsWith('<svg')) {
-      return `<div class="question-image">${image}</div>`;
+      return `<div style="text-align: center; margin: 10px 0;">${image}</div>`;
     }
     return '';
   };
 
-  // Render options based on question type
+  // Render options based on question type - using simple inline styles
   const renderOptions = (q: { type: string; options?: string[] }): string => {
     if ((q.type === 'multiple_choice' || q.type === 'true_false') && q.options) {
       return `
-        <div class="options">
+        <div style="margin-left: 10px; margin-top: 10px;">
           ${q.options.map((opt, i) => `
-            <div class="option">
-              <span class="option-letter">${String.fromCharCode(65 + i)}</span>
-              <span class="option-text">${renderLatex(opt)}</span>
+            <div style="margin-bottom: 8px; padding: 8px 12px; background: #f8f8f8; border-radius: 6px;">
+              <span style="display: inline-block; width: 24px; height: 24px; border: 2px solid #0d9488; border-radius: 50%; text-align: center; line-height: 20px; font-weight: bold; color: #0d9488; margin-right: 10px;">${String.fromCharCode(65 + i)}</span>
+              <span>${renderLatex(opt)}</span>
             </div>
           `).join('')}
         </div>
       `;
     }
     if (q.type === 'fill_blank') {
-      return '<div class="answer-line"></div>';
+      return '<div style="margin: 15px 20px; border-bottom: 2px dashed #0d9488; height: 30px;"></div>';
     }
     if (q.type === 'short_answer') {
-      return '<div class="answer-box short"></div>';
+      return '<div style="margin: 10px 20px; border: 2px dashed #ccc; border-radius: 8px; height: 60px;"></div>';
     }
     if (q.type === 'essay') {
-      return '<div class="answer-box essay"></div>';
+      return '<div style="margin: 10px 20px; border: 2px dashed #ccc; border-radius: 8px; height: 120px;"></div>';
     }
     return '';
   };
@@ -263,298 +263,42 @@ function generatePrintablePdfHtml(worksheet: Worksheet, content: 'questions' | '
   <title>${title}</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <style>
-    @page {
-      size: A4;
-      margin: 15mm;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      font-size: 11pt;
+      font-family: Arial, sans-serif;
+      font-size: 12pt;
       line-height: 1.5;
       color: #333;
       background: white;
       padding: 20px;
+      width: 754px;
     }
-
-    .header {
-      text-align: center;
-      margin-bottom: 25px;
-      padding-bottom: 15px;
-      border-bottom: 3px solid #0d9488;
-    }
-
-    .header h1 {
-      color: #0d9488;
-      font-size: 22pt;
-      margin-bottom: 8px;
-    }
-
-    .header .subtitle {
-      color: #666;
-      font-size: 10pt;
-      margin-bottom: 12px;
-    }
-
-    .info-bar {
-      display: flex;
-      justify-content: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .info-item {
-      background: #e0f2f1;
-      color: #00695c;
-      padding: 4px 12px;
-      border-radius: 12px;
-      font-size: 9pt;
-    }
-
-    .section-title {
-      font-size: 14pt;
-      font-weight: bold;
-      color: #333;
-      margin: 20px 0 15px 0;
-      padding-bottom: 8px;
-      border-bottom: 2px solid #0d9488;
-    }
-
-    .question {
-      margin-bottom: 20px;
-      padding: 15px;
-      background: #fafafa;
-      border-left: 4px solid #0d9488;
-      border-radius: 0 8px 8px 0;
-      page-break-inside: avoid;
-    }
-
-    .question-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-
-    .question-number {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .question-number .num {
-      background: #0d9488;
-      color: white;
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 10pt;
-    }
-
-    .question-type {
-      background: #e0f2f1;
-      color: #00695c;
-      padding: 3px 10px;
-      border-radius: 10px;
-      font-size: 9pt;
-      font-weight: 600;
-    }
-
-    .points {
-      background: #0d9488;
-      color: white;
-      padding: 3px 10px;
-      border-radius: 10px;
-      font-size: 9pt;
-      font-weight: 600;
-    }
-
-    .question-text {
-      font-size: 11pt;
-      margin-bottom: 12px;
-      line-height: 1.6;
-    }
-
-    .question-image {
-      display: flex;
-      justify-content: center;
-      margin: 12px 0;
-    }
-
-    .question-image svg {
-      max-width: 200px;
-      height: auto;
-    }
-
-    .options {
-      margin-left: 10px;
-    }
-
-    .option {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      margin-bottom: 8px;
-      padding: 8px 12px;
-      background: white;
-      border-radius: 6px;
-    }
-
-    .option-letter {
-      width: 22px;
-      height: 22px;
-      border: 2px solid #0d9488;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 10pt;
-      font-weight: 600;
-      color: #0d9488;
-      flex-shrink: 0;
-    }
-
-    .option-text {
-      flex: 1;
-    }
-
-    .answer-line {
-      border-bottom: 2px dashed #0d9488;
-      margin: 10px 20px;
-      height: 30px;
-    }
-
-    .answer-box {
-      border: 2px dashed #ccc;
-      border-radius: 8px;
-      margin: 10px 20px;
-    }
-
-    .answer-box.short {
-      height: 60px;
-    }
-
-    .answer-box.essay {
-      height: 120px;
-    }
-
-    .matching-options {
-      margin-left: 10px;
-    }
-
-    .matching-item {
-      padding: 8px 12px;
-      background: #f0f9ff;
-      margin: 6px 0;
-      border-radius: 6px;
-      border-left: 3px solid #0d9488;
-    }
-
-    /* Answer Key Styles */
-    .answer-key {
-      margin-top: 30px;
-      padding-top: 20px;
-      border-top: 2px dashed #ccc;
-      page-break-before: always;
-    }
-
-    .answer-key .section-title {
-      color: #10b981;
-      border-bottom-color: #10b981;
-    }
-
-    .answer-item {
-      padding: 12px;
-      background: #ecfdf5;
-      border-radius: 8px;
-      margin-bottom: 10px;
-      page-break-inside: avoid;
-    }
-
-    .answer-item .q-num {
-      color: #0d9488;
-      font-weight: bold;
-    }
-
-    .answer-item .correct {
-      color: #10b981;
-      font-weight: 600;
-      margin-top: 5px;
-    }
-
-    .answer-item .explanation {
-      font-size: 10pt;
-      color: #666;
-      margin-top: 8px;
-      font-style: italic;
-    }
-
-    .footer {
-      margin-top: 30px;
-      text-align: center;
-      color: #999;
-      font-size: 9pt;
-      padding-top: 15px;
-      border-top: 1px solid #eee;
-    }
-
-    /* KaTeX adjustments */
-    .katex {
-      font-size: 1.1em;
-    }
-
-    /* Print-specific */
-    @media print {
-      body {
-        padding: 0;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-
-      .question {
-        break-inside: avoid;
-      }
-
-      .answer-key {
-        break-before: page;
-      }
-    }
+    .katex { font-size: 1.1em; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>${title}</h1>
-    <div class="subtitle">Generated by Makos.ai</div>
-    <div class="info-bar">
-      <span class="info-item">📚 ${worksheet.subject}</span>
-      <span class="info-item">🎓 Grade ${worksheet.grade_level}</span>
-      <span class="info-item">⚡ ${worksheet.difficulty}</span>
-      <span class="info-item">🌐 ${worksheet.language.toUpperCase()}</span>
+  <!-- Header -->
+  <div style="text-align: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 3px solid #0d9488;">
+    <h1 style="color: #0d9488; font-size: 20pt; margin-bottom: 5px;">${title}</h1>
+    <p style="color: #666; font-size: 10pt; margin-bottom: 10px;">Generated by Makos.ai</p>
+    <div style="text-align: center;">
+      <span style="display: inline-block; background: #e0f2f1; color: #00695c; padding: 4px 10px; border-radius: 10px; font-size: 9pt; margin: 2px;">📚 ${worksheet.subject}</span>
+      <span style="display: inline-block; background: #e0f2f1; color: #00695c; padding: 4px 10px; border-radius: 10px; font-size: 9pt; margin: 2px;">🎓 Grade ${worksheet.grade_level}</span>
+      <span style="display: inline-block; background: #e0f2f1; color: #00695c; padding: 4px 10px; border-radius: 10px; font-size: 9pt; margin: 2px;">⚡ ${worksheet.difficulty}</span>
     </div>
   </div>
 
   ${showQuestions ? `
-    <div class="section-title">Questions</div>
+    <h2 style="font-size: 14pt; color: #333; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #0d9488;">Questions</h2>
     ${worksheet.questions.map((q, index) => `
-      <div class="question">
-        <div class="question-header">
-          <div class="question-number">
-            <span class="num">${index + 1}</span>
-            <span class="question-type">${getQuestionTypeLabel(q.type)}</span>
-          </div>
-          <span class="points">${getQuestionPoints(index)} pts</span>
+      <div style="margin-bottom: 20px; padding: 15px; background: #fafafa; border-left: 4px solid #0d9488; border-radius: 0 8px 8px 0;">
+        <div style="margin-bottom: 10px;">
+          <span style="display: inline-block; background: #0d9488; color: white; width: 24px; height: 24px; border-radius: 50%; text-align: center; line-height: 24px; font-weight: bold; font-size: 11pt; margin-right: 8px;">${index + 1}</span>
+          <span style="display: inline-block; background: #e0f2f1; color: #00695c; padding: 3px 10px; border-radius: 10px; font-size: 9pt; font-weight: bold;">${getQuestionTypeLabel(q.type)}</span>
+          <span style="float: right; background: #0d9488; color: white; padding: 3px 10px; border-radius: 10px; font-size: 9pt; font-weight: bold;">${getQuestionPoints(index)} pts</span>
         </div>
-        <div class="question-text">${renderLatex(q.question)}</div>
+        <div style="clear: both;"></div>
+        <p style="font-size: 11pt; margin: 10px 0;">${renderLatex(q.question)}</p>
         ${renderImage(q.image)}
         ${renderOptions(q)}
       </div>
@@ -562,19 +306,19 @@ function generatePrintablePdfHtml(worksheet: Worksheet, content: 'questions' | '
   ` : ''}
 
   ${showAnswerKey ? `
-    <div class="answer-key">
-      <div class="section-title">✅ Answer Key</div>
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 2px dashed #ccc;">
+      <h2 style="color: #10b981; font-size: 16pt; margin-bottom: 15px;">✅ Answer Key</h2>
       ${worksheet.questions.map((q, index) => `
-        <div class="answer-item">
-          <div><span class="q-num">${index + 1}.</span> ${renderLatex(q.question)}</div>
-          <div class="correct">Answer: ${renderLatex(Array.isArray(q.correct_answer) ? q.correct_answer.join(', ') : String(q.correct_answer || ''))}</div>
-          ${q.explanation ? `<div class="explanation">💡 ${renderLatex(q.explanation)}</div>` : ''}
+        <div style="padding: 12px; background: #ecfdf5; border-radius: 8px; margin-bottom: 10px;">
+          <p style="margin-bottom: 5px;"><strong style="color: #0d9488;">${index + 1}.</strong> ${renderLatex(q.question)}</p>
+          <p style="color: #10b981; font-weight: bold;">Answer: ${renderLatex(Array.isArray(q.correct_answer) ? q.correct_answer.join(', ') : String(q.correct_answer || ''))}</p>
+          ${q.explanation ? `<p style="font-size: 10pt; color: #666; margin-top: 5px; font-style: italic;">💡 ${renderLatex(q.explanation)}</p>` : ''}
         </div>
       `).join('')}
     </div>
   ` : ''}
 
-  <div class="footer">
+  <div style="margin-top: 30px; text-align: center; color: #999; font-size: 9pt; padding-top: 15px; border-top: 1px solid #eee;">
     Created with Makos.ai - AI Worksheet Generator
   </div>
 </body>
