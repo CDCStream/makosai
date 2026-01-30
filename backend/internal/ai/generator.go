@@ -410,9 +410,10 @@ Output ONLY valid JSON array, no markdown or extra text.`, subject, topic, strin
 // isEarlyGrade checks if the grade level requires images
 func isEarlyGrade(gradeLevel string) bool {
 	earlyGrades := []string{"k", "kindergarten", "pre-k", "prek", "1", "2", "1st", "2nd"}
-	gradeLower := strings.ToLower(gradeLevel)
+	gradeLower := strings.ToLower(strings.TrimSpace(gradeLevel))
 	for _, g := range earlyGrades {
-		if strings.Contains(gradeLower, g) {
+		// Use exact match to avoid "10" matching "1"
+		if gradeLower == g {
 			return true
 		}
 	}
