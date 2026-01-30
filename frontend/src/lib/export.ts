@@ -96,7 +96,7 @@ function stripLatex(text: string): string {
 }
 
 export async function exportToPdf(worksheet: Worksheet, content: 'questions' | 'answer_key' | 'both' = 'both'): Promise<void> {
-  console.log('🚀 PDF Export started - using jsPDF with html2canvas');
+  console.log('🚀 PDF Export started - using iframe + jsPDF');
 
   const title = content === 'questions'
     ? worksheet.title
@@ -107,40 +107,55 @@ export async function exportToPdf(worksheet: Worksheet, content: 'questions' | '
   // Generate print-friendly HTML
   const printHtml = generatePrintablePdfHtml(worksheet, content, title);
 
-  // Create a visible container (required for html2canvas)
-  const container = document.createElement('div');
-  container.innerHTML = printHtml;
-  container.style.cssText = `
+  // Create an iframe to properly render the full HTML
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = `
     position: fixed;
     top: 0;
     left: 0;
-    width: 210mm;
-    background: white;
-    z-index: -1;
+    width: 794px;
+    height: 1123px;
+    border: none;
     opacity: 0;
     pointer-events: none;
+    z-index: -1;
   `;
-  document.body.appendChild(container);
-
-  // Get the actual content element
-  const contentElement = container.querySelector('body') || container;
+  document.body.appendChild(iframe);
 
   try {
-    // Wait for content to render
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Write HTML to iframe
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!iframeDoc) {
+      throw new Error('Could not access iframe document');
+    }
+
+    iframeDoc.open();
+    iframeDoc.write(printHtml);
+    iframeDoc.close();
+
+    // Wait for content and fonts to load
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Dynamic imports
     const html2canvas = (await import('html2canvas')).default;
     const { jsPDF } = await import('jspdf');
 
+    // Get the body element from iframe
+    const body = iframeDoc.body;
+    if (!body) {
+      throw new Error('Iframe body not found');
+    }
+
     // Capture the content
-    const canvas = await html2canvas(container, {
+    const canvas = await html2canvas(body, {
       scale: 2,
       useCORS: true,
       logging: false,
       backgroundColor: '#ffffff',
-      width: 794, // A4 width in pixels at 96 DPI
+      width: 794,
+      height: body.scrollHeight,
       windowWidth: 794,
+      windowHeight: body.scrollHeight,
     });
 
     // Create PDF
@@ -186,7 +201,7 @@ export async function exportToPdf(worksheet: Worksheet, content: 'questions' | '
     showDOMModal('PDF oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.', 'error');
   } finally {
     // Clean up
-    document.body.removeChild(container);
+    document.body.removeChild(iframe);
   }
 }
 
