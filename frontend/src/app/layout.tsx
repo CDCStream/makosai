@@ -4,6 +4,7 @@ import Script from "next/script";
 import "./globals.css";
 import { AuthProvider } from "@/lib/AuthContext";
 import { ModalProvider } from "@/components/Modal";
+import { FeedbackWidget } from "@/components/FeedbackWidget";
 
 const GA_MEASUREMENT_ID = "G-SZW6X77247";
 const GOOGLE_ADS_ID = "AW-778442301";
@@ -97,6 +98,7 @@ export default function RootLayout({
         <AuthProvider>
           <ModalProvider>
             {children}
+            <FeedbackWidget />
           </ModalProvider>
         </AuthProvider>
       </body>
