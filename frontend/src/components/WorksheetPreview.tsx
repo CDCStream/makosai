@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Worksheet, Question } from '@/lib/types';
-import { Download, Printer, Share2, CheckCircle, BookOpen, FileText, Pencil, Check, X, Play, ChevronDown } from 'lucide-react';
+import { Download, Printer, Share2, CheckCircle, BookOpen, FileText, Pencil, Check, X, Play, ChevronDown, Info } from 'lucide-react';
 import { useModal } from '@/components/Modal';
 import Link from 'next/link';
 import { LatexRenderer } from './LatexRenderer';
@@ -23,6 +23,7 @@ export function WorksheetPreview({ worksheet, showActions = true, onTitleChange,
   const [editedTitle, setEditedTitle] = useState(worksheet.title);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [localQuestions, setLocalQuestions] = useState<Question[]>(worksheet.questions);
+  const [showPdfInfo, setShowPdfInfo] = useState(false);
 
   // Sync localQuestions with worksheet.questions when worksheet changes
   useEffect(() => {
@@ -207,7 +208,7 @@ export function WorksheetPreview({ worksheet, showActions = true, onTitleChange,
       {showActions && (
         <div className="flex flex-wrap gap-3 p-5 bg-gradient-to-r from-gray-50 to-teal-50/30 border-b border-gray-100">
           {/* Export PDF Dropdown */}
-          <div className="relative">
+          <div className="relative flex items-center gap-1">
             <button
               onClick={() => toggleDropdown('pdf')}
               className="btn-primary btn-sm flex items-center gap-2"
@@ -216,6 +217,37 @@ export function WorksheetPreview({ worksheet, showActions = true, onTitleChange,
               Export PDF
               <ChevronDown className={`w-4 h-4 transition-transform ${openDropdown === 'pdf' ? 'rotate-180' : ''}`} />
             </button>
+            {/* PDF Info Button */}
+            <div className="relative">
+              <button
+                onClick={() => setShowPdfInfo(!showPdfInfo)}
+                className="p-1.5 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-full transition-colors"
+                title="How to save PDF"
+              >
+                <Info className="w-4 h-4" />
+              </button>
+              {showPdfInfo && (
+                <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-100 p-4 z-50">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-5 h-5 text-teal-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-800 mb-1">How to Save as PDF</p>
+                      <p className="text-xs text-gray-600">
+                        1. Click &quot;Print&quot; button in the dialog<br />
+                        2. Select &quot;Save as PDF&quot; or &quot;Microsoft Print to PDF&quot;<br />
+                        3. Choose location and save
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowPdfInfo(false)}
+                    className="mt-3 w-full text-xs text-teal-600 hover:text-teal-700 font-medium"
+                  >
+                    Got it
+                  </button>
+                </div>
+              )}
+            </div>
             {openDropdown === 'pdf' && (
               <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
                 <button
