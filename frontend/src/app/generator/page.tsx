@@ -481,7 +481,7 @@ function GeneratorContent() {
                       }}
                     />
                   </div>
-                  <p className="text-sm text-gray-400 mt-4">This usually takes 30-40 seconds...</p>
+                  <p className="text-sm text-gray-400 mt-4">This usually takes a few minutes...</p>
                 </>
               )}
             </div>
