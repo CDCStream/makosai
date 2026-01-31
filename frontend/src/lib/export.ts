@@ -133,8 +133,8 @@ export async function exportToPdf(worksheet: Worksheet, content: 'questions' | '
     iframeDoc.write(printHtml);
     iframeDoc.close();
 
-    // Wait for content and fonts to load
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Wait for content and fonts to load (increased for KaTeX)
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
     // A4 page height in pixels at 96 DPI (accounting for padding)
     const PAGE_HEIGHT_PX = 1050; // ~A4 height minus margins
@@ -267,12 +267,8 @@ function generatePrintablePdfHtml(worksheet: Worksheet, content: 'questions' | '
           ${q.options.map((opt, i) => `
             <table style="width: 100%; margin-bottom: 8px; background: #f8f8f8; border-radius: 6px; border-collapse: collapse;">
               <tr>
-                <td style="width: 36px; padding: 8px; vertical-align: top; padding-top: 10px;">
-                  <table style="width: 24px; height: 24px; border: 2px solid #0d9488; border-radius: 50%; border-collapse: collapse;">
-                    <tr>
-                      <td style="text-align: center; vertical-align: middle; font-weight: bold; color: #0d9488; font-size: 11px; padding: 0;">${String.fromCharCode(65 + i)}</td>
-                    </tr>
-                  </table>
+                <td style="width: 40px; padding: 8px; vertical-align: top;">
+                  <div style="width: 28px; height: 28px; border: 2px solid #0d9488; border-radius: 50%; text-align: center; font-weight: bold; color: #0d9488; font-size: 13px; line-height: 24px;">${String.fromCharCode(65 + i)}</div>
                 </td>
                 <td style="padding: 8px 12px 8px 0; vertical-align: top;">${renderLatex(opt)}</td>
               </tr>
@@ -310,10 +306,14 @@ function generatePrintablePdfHtml(worksheet: Worksheet, content: 'questions' | '
       padding: 20px;
       width: 754px;
     }
-    .katex { font-size: 1em; vertical-align: middle; }
+    .katex { font-size: 1em; vertical-align: baseline; display: inline-block; }
     .katex-display { margin: 0.5em 0; text-align: left; }
     .katex-display > .katex { text-align: left; }
-    .katex .mord, .katex .mbin, .katex .mrel, .katex .mopen, .katex .mclose { vertical-align: baseline; }
+    .katex .base { vertical-align: baseline; }
+    .katex .strut { display: inline-block; }
+    .katex .frac-line { border-bottom-width: 1px; }
+    .katex .mfrac { display: inline-block; vertical-align: middle; }
+    .katex .mfrac > span { display: block; text-align: center; }
   </style>
 </head>
 <body>
@@ -336,14 +336,14 @@ function generatePrintablePdfHtml(worksheet: Worksheet, content: 'questions' | '
       <div data-question="${index}" style="margin-bottom: 20px; padding: 15px; background: #fafafa; border-left: 4px solid #0d9488; border-radius: 0 8px 8px 0; page-break-inside: avoid;">
         <table style="width: 100%; margin-bottom: 10px; border-collapse: collapse;">
           <tr>
-            <td style="vertical-align: middle; padding: 0;">
-              <table style="display: inline-table; width: 26px; height: 26px; background: #0d9488; border-radius: 50%; border-collapse: collapse; margin-right: 8px; vertical-align: middle;">
-                <tr><td style="text-align: center; vertical-align: middle; color: white; font-weight: bold; font-size: 11pt; padding: 0;">${index + 1}</td></tr>
-              </table>
-              <span style="display: inline-block; background: #e0f2f1; color: #00695c; padding: 4px 10px; border-radius: 10px; font-size: 9pt; font-weight: bold; vertical-align: middle;">${getQuestionTypeLabel(q.type)}</span>
+            <td style="width: 30px; vertical-align: middle; padding: 0;">
+              <div style="width: 28px; height: 28px; background: #0d9488; border-radius: 50%; color: white; font-weight: bold; font-size: 13px; text-align: center; line-height: 28px;">${index + 1}</div>
+            </td>
+            <td style="vertical-align: middle; padding: 0 8px;">
+              <span style="background: #e0f2f1; color: #00695c; padding: 4px 10px; border-radius: 10px; font-size: 9pt; font-weight: bold;">${getQuestionTypeLabel(q.type)}</span>
             </td>
             <td style="vertical-align: middle; text-align: right; padding: 0;">
-              <span style="display: inline-block; background: #0d9488; color: white; padding: 4px 10px; border-radius: 10px; font-size: 9pt; font-weight: bold;">${getQuestionPoints(index)} pts</span>
+              <span style="background: #0d9488; color: white; padding: 4px 10px; border-radius: 10px; font-size: 9pt; font-weight: bold;">${getQuestionPoints(index)} pts</span>
             </td>
           </tr>
         </table>
@@ -405,10 +405,8 @@ function generatePdfHtmlWithLatex(worksheet: Worksheet, content: 'questions' | '
           ${q.options.map((opt, i) => `
             <table style="width: 100%; margin-bottom: 8px; background: #f8fffe; border-radius: 6px; border-collapse: collapse;">
               <tr>
-                <td style="width: 36px; padding: 8px; vertical-align: top; padding-top: 10px;">
-                  <table style="width: 22px; height: 22px; border: 2px solid #0d9488; border-radius: 50%; border-collapse: collapse;">
-                    <tr><td style="text-align: center; vertical-align: middle; font-size: 11px; font-weight: 600; color: #0d9488; padding: 0;">${String.fromCharCode(65 + i)}</td></tr>
-                  </table>
+                <td style="width: 36px; padding: 8px; vertical-align: top;">
+                  <div style="width: 26px; height: 26px; border: 2px solid #0d9488; border-radius: 50%; text-align: center; font-size: 12px; font-weight: 600; color: #0d9488; line-height: 22px;">${String.fromCharCode(65 + i)}</div>
                 </td>
                 <td style="padding: 8px 12px 8px 0; vertical-align: top; color: #333; font-size: 13px;">${renderText(opt)}</td>
               </tr>
@@ -600,10 +598,8 @@ function renderPdfQuestionInput(q: { type: string; options?: string[] }): string
           ${q.options.map((opt, i) => `
             <table style="width: 100%; margin-bottom: 10px; background: white; border-radius: 8px; border-collapse: collapse;">
               <tr>
-                <td style="width: 40px; padding: 10px; vertical-align: top; padding-top: 12px;">
-                  <table style="width: 24px; height: 24px; border: 2px solid #0d9488; border-radius: 50%; border-collapse: collapse;">
-                    <tr><td style="text-align: center; vertical-align: middle; font-size: 12px; font-weight: 600; color: #0d9488; padding: 0;">${String.fromCharCode(65 + i)}</td></tr>
-                  </table>
+                <td style="width: 40px; padding: 10px; vertical-align: top;">
+                  <div style="width: 28px; height: 28px; border: 2px solid #0d9488; border-radius: 50%; text-align: center; font-size: 13px; font-weight: 600; color: #0d9488; line-height: 24px;">${String.fromCharCode(65 + i)}</div>
                 </td>
                 <td style="padding: 10px 10px 10px 0; vertical-align: top; color: #333;">${opt}</td>
               </tr>
@@ -948,10 +944,8 @@ function renderQuestionInputPdf(q: { type: string; options?: string[] }): string
           ${q.options.map((opt, i) => `
             <table style="width: 100%; margin-bottom: 10px; background: white; border-radius: 8px; border-collapse: collapse;">
               <tr>
-                <td style="width: 40px; padding: 10px; vertical-align: top; padding-top: 12px;">
-                  <table style="width: 24px; height: 24px; border: 2px solid #0d9488; border-radius: 50%; border-collapse: collapse;">
-                    <tr><td style="text-align: center; vertical-align: middle; font-size: 12px; font-weight: 600; color: #0d9488; padding: 0;">${String.fromCharCode(65 + i)}</td></tr>
-                  </table>
+                <td style="width: 40px; padding: 10px; vertical-align: top;">
+                  <div style="width: 28px; height: 28px; border: 2px solid #0d9488; border-radius: 50%; text-align: center; font-size: 13px; font-weight: 600; color: #0d9488; line-height: 24px;">${String.fromCharCode(65 + i)}</div>
                 </td>
                 <td style="padding: 10px 10px 10px 0; vertical-align: top; color: #333;">${opt}</td>
               </tr>
