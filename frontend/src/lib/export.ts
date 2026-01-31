@@ -96,7 +96,7 @@ function stripLatex(text: string): string {
 }
 
 export async function exportToPdf(worksheet: Worksheet, content: 'questions' | 'answer_key' | 'both' = 'both'): Promise<void> {
-  console.log('🚀 PDF Export started - using iframe + jsPDF');
+  console.log('🚀 PDF Export started - using browser print');
 
   const title = content === 'questions'
     ? worksheet.title
@@ -105,133 +105,391 @@ export async function exportToPdf(worksheet: Worksheet, content: 'questions' | '
     : worksheet.title;
 
   // Generate print-friendly HTML
-  const printHtml = generatePrintablePdfHtml(worksheet, content, title);
+  const printHtml = generatePrintReadyHtml(worksheet, content, title);
 
-  // Create an iframe to properly render the full HTML
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 794px;
-    height: 1123px;
-    border: none;
-    opacity: 0;
-    pointer-events: none;
-    z-index: -1;
-  `;
-  document.body.appendChild(iframe);
-
-  try {
-    // Write HTML to iframe
-    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-    if (!iframeDoc) {
-      throw new Error('Could not access iframe document');
-    }
-
-    iframeDoc.open();
-    iframeDoc.write(printHtml);
-    iframeDoc.close();
-
-    // Wait for content and fonts to load (increased for KaTeX)
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // A4 page height in pixels at 96 DPI (accounting for padding)
-    const PAGE_HEIGHT_PX = 1050; // ~A4 height minus margins
-
-    // Find all question elements and add page break spacers where needed
-    const questions = iframeDoc.querySelectorAll('[data-question]');
-    questions.forEach((questionEl) => {
-      const el = questionEl as HTMLElement;
-      const rect = el.getBoundingClientRect();
-      const questionTop = rect.top + iframeDoc.documentElement.scrollTop;
-      const questionBottom = questionTop + rect.height;
-
-      // Calculate which page this question starts on
-      const startPage = Math.floor(questionTop / PAGE_HEIGHT_PX);
-      // Calculate which page this question ends on
-      const endPage = Math.floor(questionBottom / PAGE_HEIGHT_PX);
-
-      // If question spans multiple pages, push it to next page
-      if (startPage !== endPage && rect.height < PAGE_HEIGHT_PX * 0.8) {
-        const spacerHeight = ((startPage + 1) * PAGE_HEIGHT_PX) - questionTop + 20;
-        const spacer = iframeDoc.createElement('div');
-        spacer.style.height = `${spacerHeight}px`;
-        spacer.style.width = '100%';
-        el.parentNode?.insertBefore(spacer, el);
-      }
-    });
-
-    // Wait a bit for spacers to be applied
-    await new Promise(resolve => setTimeout(resolve, 200));
-
-    // Dynamic imports
-    const html2canvas = (await import('html2canvas')).default;
-    const { jsPDF } = await import('jspdf');
-
-    // Get the body element from iframe
-    const body = iframeDoc.body;
-    if (!body) {
-      throw new Error('Iframe body not found');
-    }
-
-    // Capture the content
-    const canvas = await html2canvas(body, {
-      scale: 2,
-      useCORS: true,
-      logging: false,
-      backgroundColor: '#ffffff',
-      width: 794,
-      height: body.scrollHeight,
-      windowWidth: 794,
-      windowHeight: body.scrollHeight,
-    });
-
-    // Create PDF
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4',
-    });
-
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = pdf.internal.pageSize.getHeight();
-    const imgWidth = pdfWidth;
-    const imgHeight = (canvas.height * pdfWidth) / canvas.width;
-
-    let heightLeft = imgHeight;
-    let position = 0;
-
-    // Add first page
-    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-    heightLeft -= pdfHeight;
-
-    // Add additional pages if needed
-    while (heightLeft > 0) {
-      position = heightLeft - imgHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pdfHeight;
-    }
-
-    // Generate filename
-    const filename = content === 'questions'
-      ? `${worksheet.title.replace(/\s+/g, '_')}_questions.pdf`
-      : content === 'answer_key'
-      ? `${worksheet.title.replace(/\s+/g, '_')}_answer_key.pdf`
-      : `${worksheet.title.replace(/\s+/g, '_')}.pdf`;
-
-    // Save PDF
-    pdf.save(filename);
-    console.log('✅ PDF exported successfully');
-  } catch (error) {
-    console.error('PDF export error:', error);
-    showDOMModal('PDF oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.', 'error');
-  } finally {
-    // Clean up
-    document.body.removeChild(iframe);
+  // Open in new window
+  const printWindow = window.open('', '_blank', 'width=800,height=600');
+  if (!printWindow) {
+    showDOMModal('Pop-up engelleyici aktif. Lütfen pop-up\'lara izin verin ve tekrar deneyin.', 'warning');
+    return;
   }
+
+  printWindow.document.write(printHtml);
+  printWindow.document.close();
+
+  // Wait for content to load then print
+  printWindow.onload = () => {
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+    }, 500);
+  };
+
+  // Fallback
+  setTimeout(() => {
+    if (printWindow && !printWindow.closed) {
+      printWindow.focus();
+      printWindow.print();
+    }
+  }, 1500);
+}
+
+// Generate print-ready HTML with proper page break CSS
+function generatePrintReadyHtml(worksheet: Worksheet, content: 'questions' | 'answer_key' | 'both', title: string): string {
+  const showQuestions = content === 'questions' || content === 'both';
+  const showAnswerKey = (content === 'answer_key' || content === 'both') && worksheet.include_answer_key;
+
+  const totalQuestions = worksheet.questions.length;
+  const basePoints = Math.floor(100 / totalQuestions);
+  const remainder = 100 - (basePoints * totalQuestions);
+  const getQuestionPoints = (index: number): number => basePoints + (index < remainder ? 1 : 0);
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${title}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <style>
+    @page {
+      size: A4;
+      margin: 15mm;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.6;
+      color: #333;
+      background: white;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 3px solid #0d9488;
+    }
+    .header h1 {
+      color: #0d9488;
+      font-size: 20pt;
+      margin-bottom: 5px;
+    }
+    .header .subtitle {
+      color: #666;
+      font-size: 9pt;
+      margin-bottom: 10px;
+    }
+    .badge {
+      display: inline-block;
+      background: #e0f2f1;
+      color: #00695c;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 9pt;
+      margin: 2px;
+    }
+    .section-title {
+      font-size: 14pt;
+      color: #333;
+      margin-bottom: 15px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #0d9488;
+    }
+    .question {
+      margin-bottom: 18px;
+      padding: 12px 15px;
+      background: #f8f9fa;
+      border-left: 4px solid #0d9488;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .question-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .question-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      background: #0d9488;
+      color: white;
+      border-radius: 50%;
+      font-weight: bold;
+      font-size: 11pt;
+    }
+    .question-type {
+      background: #e0f2f1;
+      color: #00695c;
+      padding: 3px 10px;
+      border-radius: 8px;
+      font-size: 9pt;
+      font-weight: 600;
+    }
+    .question-pts {
+      background: #0d9488;
+      color: white;
+      padding: 3px 10px;
+      border-radius: 8px;
+      font-size: 9pt;
+      font-weight: 600;
+      margin-left: auto;
+    }
+    .question-text {
+      font-size: 11pt;
+      margin: 8px 0;
+      line-height: 1.6;
+    }
+    .options {
+      margin-left: 10px;
+      margin-top: 10px;
+    }
+    .option {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 8px;
+      padding: 8px 12px;
+      background: white;
+      border-radius: 6px;
+    }
+    .option-letter {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 24px;
+      border: 2px solid #0d9488;
+      border-radius: 50%;
+      font-weight: bold;
+      color: #0d9488;
+      font-size: 11px;
+    }
+    .option-text {
+      padding-top: 2px;
+    }
+    .blank-line {
+      margin: 12px 20px;
+      border-bottom: 2px dashed #0d9488;
+      height: 25px;
+    }
+    .text-box {
+      margin: 10px 20px;
+      border: 2px dashed #ccc;
+      border-radius: 6px;
+      min-height: 50px;
+    }
+    .essay-box {
+      margin: 10px 20px;
+      border: 2px dashed #ccc;
+      border-radius: 6px;
+      min-height: 100px;
+    }
+    .answer-key {
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 2px dashed #ccc;
+      page-break-before: always;
+    }
+    .answer-key h2 {
+      color: #10b981;
+      font-size: 16pt;
+      margin-bottom: 15px;
+    }
+    .answer-item {
+      padding: 8px 12px;
+      background: #ecfdf5;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      page-break-inside: avoid;
+    }
+    .answer-item strong {
+      color: #0d9488;
+    }
+    .answer-item .answer {
+      color: #10b981;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+    .footer {
+      margin-top: 30px;
+      text-align: center;
+      color: #999;
+      font-size: 9pt;
+      padding-top: 15px;
+      border-top: 1px solid #eee;
+    }
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .question { page-break-inside: avoid; }
+      .answer-item { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>${title}</h1>
+    <p class="subtitle">Generated by Makos.ai</p>
+    <div>
+      <span class="badge">${worksheet.subject}</span>
+      <span class="badge">Grade ${worksheet.grade_level}</span>
+      <span class="badge">${worksheet.difficulty}</span>
+    </div>
+  </div>
+
+  ${showQuestions ? `
+    <h2 class="section-title">Questions</h2>
+    ${worksheet.questions.map((q, index) => `
+      <div class="question">
+        <div class="question-header">
+          <span class="question-num">${index + 1}</span>
+          <span class="question-type">${getQuestionTypeLabel(q.type)}</span>
+          <span class="question-pts">${getQuestionPoints(index)} pts</span>
+        </div>
+        <p class="question-text">${renderLatexToHtml(q.question)}</p>
+        ${renderPrintOptions(q)}
+      </div>
+    `).join('')}
+  ` : ''}
+
+  ${showAnswerKey ? `
+    <div class="answer-key">
+      <h2>Answer Key</h2>
+      ${worksheet.questions.map((q, index) => `
+        <div class="answer-item">
+          <strong>${index + 1}.</strong>
+          <span class="answer">${Array.isArray(q.correct_answer) ? q.correct_answer.join(', ') : q.correct_answer}</span>
+        </div>
+      `).join('')}
+    </div>
+  ` : ''}
+
+  <div class="footer">
+    Created with Makos.ai - AI Worksheet Generator
+  </div>
+</body>
+</html>`;
+}
+
+function renderPrintOptions(q: { type: string; options?: string[] }): string {
+  if ((q.type === 'multiple_choice' || q.type === 'true_false') && q.options) {
+    return `
+      <div class="options">
+        ${q.options.map((opt, i) => `
+          <div class="option">
+            <span class="option-letter">${String.fromCharCode(65 + i)}</span>
+            <span class="option-text">${renderLatexToHtml(opt)}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+  if (q.type === 'fill_blank') {
+    return '<div class="blank-line"></div>';
+  }
+  if (q.type === 'short_answer') {
+    return '<div class="text-box"></div>';
+  }
+  if (q.type === 'essay') {
+    return '<div class="essay-box"></div>';
+  }
+  return '';
+}
+
+// Simple PDF content generator without iframe complexity
+function generateSimplePdfContent(worksheet: Worksheet, content: 'questions' | 'answer_key' | 'both', title: string): string {
+  const showQuestions = content === 'questions' || content === 'both';
+  const showAnswerKey = (content === 'answer_key' || content === 'both') && worksheet.include_answer_key;
+
+  const totalQuestions = worksheet.questions.length;
+  const basePoints = Math.floor(100 / totalQuestions);
+  const remainder = 100 - (basePoints * totalQuestions);
+  const getQuestionPoints = (index: number): number => basePoints + (index < remainder ? 1 : 0);
+
+  let html = `
+    <div style="text-align: center; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 3px solid #0d9488;">
+      <h1 style="color: #0d9488; font-size: 22px; margin: 0 0 8px 0;">${title}</h1>
+      <p style="color: #666; font-size: 11px; margin: 0 0 12px 0;">Generated by Makos.ai</p>
+      <div>
+        <span style="display: inline-block; background: #e0f2f1; color: #00695c; padding: 4px 12px; border-radius: 12px; font-size: 10px; margin: 2px;">${worksheet.subject}</span>
+        <span style="display: inline-block; background: #e0f2f1; color: #00695c; padding: 4px 12px; border-radius: 12px; font-size: 10px; margin: 2px;">Grade ${worksheet.grade_level}</span>
+        <span style="display: inline-block; background: #e0f2f1; color: #00695c; padding: 4px 12px; border-radius: 12px; font-size: 10px; margin: 2px;">${worksheet.difficulty}</span>
+      </div>
+    </div>
+  `;
+
+  if (showQuestions) {
+    html += `<h2 style="font-size: 16px; color: #333; margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #0d9488;">Questions</h2>`;
+
+    worksheet.questions.forEach((q, index) => {
+      html += `
+        <div style="margin-bottom: 20px; padding: 15px; background: #f5f5f5; border-left: 4px solid #0d9488;">
+          <div style="margin-bottom: 10px;">
+            <span style="display: inline-block; background: #0d9488; color: white; width: 24px; height: 24px; border-radius: 50%; text-align: center; line-height: 24px; font-weight: bold; font-size: 12px; margin-right: 8px;">${index + 1}</span>
+            <span style="display: inline-block; background: #e0f2f1; color: #00695c; padding: 3px 10px; border-radius: 8px; font-size: 10px; font-weight: bold; margin-right: 8px;">${getQuestionTypeLabel(q.type)}</span>
+            <span style="display: inline-block; background: #0d9488; color: white; padding: 3px 10px; border-radius: 8px; font-size: 10px; font-weight: bold;">${getQuestionPoints(index)} pts</span>
+          </div>
+          <p style="font-size: 13px; margin: 10px 0; line-height: 1.6;">${q.question}</p>
+          ${renderSimpleOptions(q)}
+        </div>
+      `;
+    });
+  }
+
+  if (showAnswerKey) {
+    html += `
+      <div style="margin-top: 30px; padding-top: 20px; border-top: 2px dashed #ccc;">
+        <h2 style="color: #10b981; font-size: 18px; margin: 0 0 15px 0;">Answer Key</h2>
+        ${worksheet.questions.map((q, index) => `
+          <div style="padding: 10px; background: #ecfdf5; border-radius: 6px; margin-bottom: 8px;">
+            <span style="font-weight: bold; color: #0d9488;">${index + 1}.</span>
+            <span style="color: #10b981; font-weight: 600; margin-left: 8px;">${Array.isArray(q.correct_answer) ? q.correct_answer.join(', ') : q.correct_answer}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  html += `
+    <div style="margin-top: 30px; text-align: center; color: #999; font-size: 10px; padding-top: 15px; border-top: 1px solid #eee;">
+      Created with Makos.ai - AI Worksheet Generator
+    </div>
+  `;
+
+  return html;
+}
+
+function renderSimpleOptions(q: { type: string; options?: string[] }): string {
+  if ((q.type === 'multiple_choice' || q.type === 'true_false') && q.options) {
+    return `
+      <div style="margin-left: 10px; margin-top: 10px;">
+        ${q.options.map((opt, i) => `
+          <div style="margin-bottom: 8px; padding: 8px 12px; background: white; border-radius: 6px; display: flex; align-items: flex-start;">
+            <span style="display: inline-block; min-width: 24px; height: 24px; border: 2px solid #0d9488; border-radius: 50%; text-align: center; line-height: 20px; font-weight: bold; color: #0d9488; font-size: 11px; margin-right: 10px;">${String.fromCharCode(65 + i)}</span>
+            <span style="padding-top: 2px;">${opt}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+  if (q.type === 'fill_blank') {
+    return '<div style="margin: 15px 20px; border-bottom: 2px dashed #0d9488; height: 25px;"></div>';
+  }
+  if (q.type === 'short_answer') {
+    return '<div style="margin: 10px 20px; border: 2px dashed #ccc; border-radius: 6px; height: 50px;"></div>';
+  }
+  if (q.type === 'essay') {
+    return '<div style="margin: 10px 20px; border: 2px dashed #ccc; border-radius: 6px; height: 100px;"></div>';
+  }
+  return '';
 }
 
 // Generate print-friendly HTML with simple CSS for html2canvas compatibility
@@ -298,22 +556,14 @@ function generatePrintablePdfHtml(worksheet: Worksheet, content: 'questions' | '
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: Arial, sans-serif;
-      font-size: 12pt;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 11pt;
       line-height: 1.5;
       color: #333;
       background: white;
-      padding: 20px;
-      width: 754px;
+      padding: 25px;
+      width: 744px;
     }
-    .katex { font-size: 1em; vertical-align: baseline; display: inline-block; }
-    .katex-display { margin: 0.5em 0; text-align: left; }
-    .katex-display > .katex { text-align: left; }
-    .katex .base { vertical-align: baseline; }
-    .katex .strut { display: inline-block; }
-    .katex .frac-line { border-bottom-width: 1px; }
-    .katex .mfrac { display: inline-block; vertical-align: middle; }
-    .katex .mfrac > span { display: block; text-align: center; }
   </style>
 </head>
 <body>
@@ -333,7 +583,7 @@ function generatePrintablePdfHtml(worksheet: Worksheet, content: 'questions' | '
   ${showQuestions ? `
     <h2 style="font-size: 14pt; color: #333; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #0d9488;">Questions</h2>
     ${worksheet.questions.map((q, index) => `
-      <div data-question="${index}" style="margin-bottom: 20px; padding: 15px; background: #fafafa; border-left: 4px solid #0d9488; border-radius: 0 8px 8px 0; page-break-inside: avoid;">
+      <div style="margin-bottom: 20px; padding: 15px; background: #f5f5f5; border-left: 4px solid #0d9488;">
         <table style="width: 100%; margin-bottom: 10px; border-collapse: collapse;">
           <tr>
             <td style="width: 30px; vertical-align: middle; padding: 0;">
