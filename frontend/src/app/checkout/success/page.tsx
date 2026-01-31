@@ -1,9 +1,27 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle } from 'lucide-react';
+import { trackPurchase } from '@/lib/gtag';
 
 export default function CheckoutSuccessPage() {
+  const searchParams = useSearchParams();
+  const checkoutId = searchParams.get('checkout_id');
+
+  useEffect(() => {
+    // Track Google Ads conversion for purchase
+    // Only track once per checkout
+    const purchaseTracked = sessionStorage.getItem(`purchase_tracked_${checkoutId}`);
+    if (!purchaseTracked) {
+      trackPurchase(1.0, checkoutId || undefined);
+      if (checkoutId) {
+        sessionStorage.setItem(`purchase_tracked_${checkoutId}`, 'true');
+      }
+    }
+  }, [checkoutId]);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100 py-12 px-4">
       <div className="max-w-md w-full text-center bg-white p-8 rounded-2xl shadow-xl">

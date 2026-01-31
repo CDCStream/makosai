@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { sendWelcomeEmail } from './api';
+import { trackSignUp } from './gtag';
 
 interface AuthContextType {
   user: User | null;
@@ -51,6 +52,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const userName = user.user_metadata?.full_name || user.user_metadata?.name || '';
           await sendWelcomeEmail(user.email || '', userName);
           localStorage.setItem(`welcome_email_sent_${user.id}`, 'true');
+
+          // Track Google Ads conversion for sign up
+          trackSignUp();
         }
       }
     });
